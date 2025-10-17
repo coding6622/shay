@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>گالری تصاویر</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Vazir', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 30px;
+            animation: fadeIn 0.8s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        
+        .card img {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .card-content {
+            padding: 25px;
+        }
+        
+        .card-text {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #555;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px 20px;
+            font-size: 20px;
+            color: #3498db;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 50px 20px;
+            font-size: 18px;
+            color: #e74c3c;
+            background: #fadbd8;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .last-updated {
+            text-align: center;
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card img {
+                height: 300px;
+            }
+            
+            .card-text {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>گالری تصاویر</h1>
+        
+        <div id="content">
+            <div class="loading">در حال آماده‌سازی محتوا...</div>
+        </div>
+        
+        <div id="lastUpdated" class="last-updated"></div>
+    </div>
+
+    <script>
+        // Function to get GitHub username and repo from URL
+        function getRepoInfo() {
+            const hostname = window.location.hostname;
+            const pathname = window.location.pathname;
+            
+            // For user/organization sites: username.github.io
+            if (hostname.endsWith('.github.io') && pathname === '/') {
+                const username = hostname.split('.')[0];
+                return {
+                    username: username,
+                    repo: `${username}.github.io`
+                };
+            }
+            
+            // For project sites: username.github.io/repo
+            if (hostname.endsWith('.github.io')) {
+                const username = hostname.split('.')[0];
+                const pathParts = pathname.split('/').filter(p => p);
+                const repo = pathParts[0] || `${username}.github.io`;
+                return {
+                    username: username,
+                    repo: repo
+                };
+            }
+            
+            // For custom domains or other cases, we need to provide fallback
+            return {
+                username: 'your-username',
+                repo: 'your-repo'
+            };
+        }
+        
+        // Load content from GitHub
+        async function loadContent() {
+            const contentDiv = document.getElementById('content');
+            const lastUpdatedDiv = document.getElementById('lastUpdated');
+            
+            try {
+                const repoInfo = getRepoInfo();
+                const rawUrl = `https://raw.githubusercontent.com/${repoInfo.username}/${repoInfo.repo}/main/data.json`;
+                
+                const response = await fetch(rawUrl);
+                
+                if (!response.ok) {
+                    throw new Error('محتوایی یافت نشد');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.image || !data.text) {
+                    throw new Error('محتوای نامعتبر');
+                }
+                
+                // Display content
+                contentDiv.innerHTML = `
+                    <div class="card">
+                        <img src="${data.image}" alt="تصویر گالری">
+                        <div class="card-content">
+                            <p class="card-text">${data.text}</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Display last updated time
+                if (data.lastUpdated) {
+                    const date = new Date(data.lastUpdated);
+                    const formattedDate = date.toLocaleDateString('fa-IR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    lastUpdatedDiv.textContent = `آخرین به‌روزرسانی: ${formattedDate}`;
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div class="error">
+                        خطا در بارگذاری محتوا: ${error.message}
+                    </div>
+                `;
+                lastUpdatedDiv.textContent = '';
+            }
+        }
+        
+        // Load content on page load
+        loadContent();
+        
+        // Refresh content every 5 minutes
+        setInterval(loadContent, 300000);
+    </script>
+</body>
+</html>
