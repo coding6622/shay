@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@shayan878</title>
+    <title>shayan878</title>
     <style>
         * {
             margin: 0;
@@ -299,7 +299,7 @@
     </div>
     
     <div class="container">
-        <h1> shayan878 </h1>
+        <h1>گالری تصاویر</h1>
         
         <div id="content">
             <div class="loading">در حال آماده‌سازی محتوا...</div>
@@ -401,15 +401,32 @@
             
             try {
                 const repoInfo = getRepoInfo();
-                const rawUrl = `https://raw.githubusercontent.com/${repoInfo.username}/${repoInfo.repo}/main/data.json`;
+                // Try both main and master branches
+                const branches = ['main', 'master'];
+                let data = null;
+                let branchUsed = '';
                 
-                const response = await fetch(rawUrl);
-                
-                if (!response.ok) {
-                    throw new Error('محتوایی یافت نشد');
+                for (const branch of branches) {
+                    try {
+                        const rawUrl = `https://raw.githubusercontent.com/${repoInfo.username}/${repoInfo.repo}/${branch}/data.json`;
+                        console.log(`Trying to fetch from: ${rawUrl}`);
+                        
+                        const response = await fetch(rawUrl);
+                        
+                        if (response.ok) {
+                            data = await response.json();
+                            branchUsed = branch;
+                            console.log(`Successfully fetched data from ${branch} branch`);
+                            break;
+                        }
+                    } catch (error) {
+                        console.log(`Failed to fetch from ${branch} branch:`, error);
+                    }
                 }
                 
-                const data = await response.json();
+                if (!data) {
+                    throw new Error('محتوایی یافت نشد');
+                }
                 
                 if (!data.image || !data.text) {
                     throw new Error('محتوای نامعتبر');
@@ -418,7 +435,7 @@
                 // Display content
                 contentDiv.innerHTML = `
                     <div class="card">
-                        <img src="${data.image}" alt="تصویر گالری">
+                        <img src="${data.image}" alt="tel=shayan878" onerror="this.src='https://picsum.photos/seed/gallery/800/400.jpg'">
                         <div class="card-content">
                             <p class="card-text">${data.text}</p>
                         </div>
@@ -435,9 +452,10 @@
                         hour: '2-digit',
                         minute: '2-digit'
                     });
-                    lastUpdatedDiv.textContent = `آخرین به‌روزرسانی: ${formattedDate}`;
+                    lastUpdatedDiv.textContent = `آخرین به‌روزرسانی: ${formattedDate} (شاخه: ${branchUsed})`;
                 }
             } catch (error) {
+                console.error('Error loading content:', error);
                 contentDiv.innerHTML = `
                     <div class="error">
                         خطا در بارگذاری محتوا: ${error.message}
