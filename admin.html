@@ -50,7 +50,7 @@
             color: #555;
         }
         
-        input, textarea {
+        input, textarea, select {
             width: 100%;
             padding: 15px;
             border: 2px solid #e0e0e0;
@@ -59,7 +59,7 @@
             transition: border-color 0.3s;
         }
         
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             border-color: #3498db;
             outline: none;
         }
@@ -163,6 +163,18 @@
             margin-right: 10px;
             color: #2c3e50;
         }
+        
+        .preview-container {
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -182,6 +194,13 @@
             <div class="form-group">
                 <label for="token">توکن دسترسی GitHub:</label>
                 <input type="password" id="token" placeholder="ghp_XXXXXXXXXXXXXXXXXXXXXXXX">
+            </div>
+            <div class="form-group">
+                <label for="branch">نام شاخه (Branch):</label>
+                <select id="branch">
+                    <option value="main">main</option>
+                    <option value="master">master</option>
+                </select>
             </div>
         </div>
         
@@ -205,6 +224,9 @@
             <div class="form-group" id="urlGroup">
                 <label for="imageUrl">آدرس تصویر:</label>
                 <input type="text" id="imageUrl" placeholder="https://example.com/image.jpg">
+                <div class="preview-container">
+                    <img id="urlPreview" class="preview-image" style="display: none;">
+                </div>
             </div>
             
             <div class="form-group" id="fileGroup" style="display: none;">
@@ -214,6 +236,9 @@
                     <span class="file-name">فایلی انتخاب نشده</span>
                     <span>انتخاب فایل</span>
                 </label>
+                <div class="preview-container">
+                    <img id="filePreview" class="preview-image" style="display: none;">
+                </div>
             </div>
             
             <div class="form-group">
@@ -237,6 +262,9 @@
         const fileName = document.querySelector('.file-name');
         const publishBtn = document.getElementById('publishBtn');
         const notification = document.getElementById('notification');
+        const imageUrl = document.getElementById('imageUrl');
+        const urlPreview = document.getElementById('urlPreview');
+        const filePreview = document.getElementById('filePreview');
         
         // Radio button change handler
         urlOption.addEventListener('change', () => {
@@ -253,8 +281,33 @@
         imageFile.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 fileName.textContent = e.target.files[0].name;
+                
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    filePreview.src = event.target.result;
+                    filePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(e.target.files[0]);
             } else {
                 fileName.textContent = 'فایلی انتخاب نشده';
+                filePreview.style.display = 'none';
+            }
+        });
+        
+        // URL input change handler
+        imageUrl.addEventListener('input', (e) => {
+            const url = e.target.value.trim();
+            if (url) {
+                urlPreview.src = url;
+                urlPreview.style.display = 'block';
+                
+                // Handle image load error
+                urlPreview.onerror = function() {
+                    urlPreview.style.display = 'none';
+                };
+            } else {
+                urlPreview.style.display = 'none';
             }
         });
         
@@ -275,6 +328,7 @@
             const username = document.getElementById('username').value.trim();
             const repo = document.getElementById('repo').value.trim();
             const token = document.getElementById('token').value.trim();
+            const branch = document.getElementById('branch').value;
             const contentText = document.getElementById('contentText').value.trim();
             
             // Validate inputs
@@ -296,6 +350,14 @@
                     showNotification('لطفاً آدرس تصویر را وارد کنید', true);
                     return;
                 }
+                
+                // Validate URL
+                try {
+                    new URL(imageUrl);
+                } catch (e) {
+                    showNotification('آدرس تصویر نامعتبر است', true);
+                    return;
+                }
             } else {
                 if (imageFile.files.length === 0) {
                     showNotification('لطفاً یک فایل تصویر انتخاب کنید', true);
@@ -308,18 +370,18 @@
                 
                 reader.onload = async function(e) {
                     imageUrl = e.target.result;
-                    await publishContent(username, repo, token, imageUrl, contentText);
+                    await publishContent(username, repo, token, branch, imageUrl, contentText);
                 };
                 
                 reader.readAsDataURL(file);
                 return;
             }
             
-            await publishContent(username, repo, token, imageUrl, contentText);
+            await publishContent(username, repo, token, branch, imageUrl, contentText);
         });
         
         // Function to publish content to GitHub
-        async function publishContent(username, repo, token, imageUrl, contentText) {
+        async function publishContent(username, repo, token, branch, imageUrl, contentText) {
             publishBtn.disabled = true;
             publishBtn.textContent = 'در حال انتشار...';
             
@@ -350,18 +412,21 @@
                     }
                 } catch (error) {
                     // File doesn't exist
+                    console.log('File does not exist, will create a new one');
                 }
                 
                 // Create or update file
                 const body = {
                     message: 'Update content data',
                     content: content,
-                    branch: 'main'
+                    branch: branch
                 };
                 
                 if (sha) {
                     body.sha = sha;
                 }
+                
+                console.log('Sending request to GitHub API:', body);
                 
                 const updateResponse = await fetch(fileUrl, {
                     method: 'PUT',
@@ -372,6 +437,9 @@
                     body: JSON.stringify(body)
                 });
                 
+                const responseData = await updateResponse.json();
+                console.log('GitHub API response:', responseData);
+                
                 if (updateResponse.ok) {
                     showNotification('محتوا با موفقیت منتشر شد!');
                     
@@ -380,11 +448,13 @@
                     document.getElementById('imageUrl').value = '';
                     imageFile.value = '';
                     fileName.textContent = 'فایلی انتخاب نشده';
+                    urlPreview.style.display = 'none';
+                    filePreview.style.display = 'none';
                 } else {
-                    const errorData = await updateResponse.json();
-                    showNotification(`خطا در انتشار: ${errorData.message}`, true);
+                    showNotification(`خطا در انتشار: ${responseData.message}`, true);
                 }
             } catch (error) {
+                console.error('Error in publishContent:', error);
                 showNotification(`خطا: ${error.message}`, true);
             } finally {
                 publishBtn.disabled = false;
@@ -393,4 +463,4 @@
         }
     </script>
 </body>
-</html>
+    </html>
